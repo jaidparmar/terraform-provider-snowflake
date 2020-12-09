@@ -16,11 +16,12 @@ jobs:
       matrix:
         target:
           - test-acceptance
+          - lint-ci
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.15.2'
+          go-version: '1.15.5'
       - name: Install dependencies
         run: make setup
 
@@ -45,13 +46,14 @@ jobs:
       matrix:
         target:
           - test-acceptance
+          - lint-ci
     steps:
       - uses: actions/checkout@v2
         with:
           ref: 'refs/pull/${{ github.event.client_payload.pull_request.number }}/merge'
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.15.2'
+          go-version: '1.15.5'
       - name: Install dependencies
         run: make setup
 

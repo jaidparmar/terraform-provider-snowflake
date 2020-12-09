@@ -7,8 +7,7 @@ import (
 	"github.com/chanzuckerberg/terraform-provider-snowflake/pkg/snowflake"
 )
 
-var ValidStagePrivileges = newPrivilegeSet(
-	privilegeAll,
+var validStagePrivileges = NewPrivilegeSet(
 	privilegeOwnership,
 	privilegeUsage,
 	// These privileges are only valid for internal stages
@@ -40,7 +39,7 @@ var stageGrantSchema = map[string]*schema.Schema{
 		Optional:     true,
 		Description:  "The privilege to grant on the stage.",
 		Default:      "USAGE",
-		ValidateFunc: validation.StringInSlice(ValidStagePrivileges.toList(), true),
+		ValidateFunc: validation.StringInSlice(validStagePrivileges.ToList(), true),
 		ForceNew:     true,
 	},
 	"roles": {
@@ -67,36 +66,38 @@ var stageGrantSchema = map[string]*schema.Schema{
 }
 
 // StageGrant returns a pointer to the resource representing a stage grant
-func StageGrant() *schema.Resource {
-	return &schema.Resource{
-		Create: CreateStageGrant,
-		Read:   ReadStageGrant,
-		Delete: DeleteStageGrant,
+func StageGrant() *TerraformGrantResource {
+	return &TerraformGrantResource{
+		Resource: &schema.Resource{
+			Create: CreateStageGrant,
+			Read:   ReadStageGrant,
+			Delete: DeleteStageGrant,
 
-		Schema: stageGrantSchema,
-		Importer: &schema.ResourceImporter{
-			State: schema.ImportStatePassthrough,
+			Schema: stageGrantSchema,
+			Importer: &schema.ResourceImporter{
+				StateContext: schema.ImportStatePassthroughContext,
+			},
 		},
+		ValidPrivs: validStagePrivileges,
 	}
 }
 
 // CreateStageGrant implements schema.CreateFunc
-func CreateStageGrant(data *schema.ResourceData, meta interface{}) error {
+func CreateStageGrant(d *schema.ResourceData, meta interface{}) error {
 	var stageName string
-	if _, ok := data.GetOk("stage_name"); ok {
-		stageName = data.Get("stage_name").(string)
+	if _, ok := d.GetOk("stage_name"); ok {
+		stageName = d.Get("stage_name").(string)
 	} else {
 		stageName = ""
 	}
-	schemaName := data.Get("schema_name").(string)
-	dbName := data.Get("database_name").(string)
-	priv := data.Get("privilege").(string)
-	grantOption := data.Get("with_grant_option").(bool)
+	schemaName := d.Get("schema_name").(string)
+	dbName := d.Get("database_name").(string)
+	priv := d.Get("privilege").(string)
+	grantOption := d.Get("with_grant_option").(bool)
 
-	var builder snowflake.GrantBuilder
-	builder = snowflake.StageGrant(dbName, schemaName, stageName)
+	builder := snowflake.StageGrant(dbName, schemaName, stageName)
 
-	err := createGenericGrant(data, meta, builder)
+	err := createGenericGrant(d, meta, builder)
 	if err != nil {
 		return err
 	}
@@ -112,14 +113,14 @@ func CreateStageGrant(data *schema.ResourceData, meta interface{}) error {
 	if err != nil {
 		return err
 	}
-	data.SetId(dataIDInput)
+	d.SetId(dataIDInput)
 
-	return ReadStageGrant(data, meta)
+	return ReadStageGrant(d, meta)
 }
 
 // ReadStageGrant implements schema.ReadFunc
-func ReadStageGrant(data *schema.ResourceData, meta interface{}) error {
-	grantID, err := grantIDFromString(data.Id())
+func ReadStageGrant(d *schema.ResourceData, meta interface{}) error {
+	grantID, err := grantIDFromString(d.Id())
 	if err != nil {
 		return err
 	}
@@ -128,34 +129,34 @@ func ReadStageGrant(data *schema.ResourceData, meta interface{}) error {
 	stageName := grantID.ObjectName
 	priv := grantID.Privilege
 
-	err = data.Set("database_name", dbName)
+	err = d.Set("database_name", dbName)
 	if err != nil {
 		return err
 	}
-	err = data.Set("schema_name", schemaName)
+	err = d.Set("schema_name", schemaName)
 	if err != nil {
 		return err
 	}
-	err = data.Set("stage_name", stageName)
+	err = d.Set("stage_name", stageName)
 	if err != nil {
 		return err
 	}
-	err = data.Set("privilege", priv)
+	err = d.Set("privilege", priv)
 	if err != nil {
 		return err
 	}
-	err = data.Set("with_grant_option", grantID.GrantOption)
+	err = d.Set("with_grant_option", grantID.GrantOption)
 	if err != nil {
 		return err
 	}
 
 	builder := snowflake.StageGrant(dbName, schemaName, stageName)
-	return readGenericGrant(data, meta, stageGrantSchema, builder, false, ValidStagePrivileges)
+	return readGenericGrant(d, meta, stageGrantSchema, builder, false, validStagePrivileges)
 }
 
 // DeleteStageGrant implements schema.DeleteFunc
-func DeleteStageGrant(data *schema.ResourceData, meta interface{}) error {
-	grantID, err := grantIDFromString(data.Id())
+func DeleteStageGrant(d *schema.ResourceData, meta interface{}) error {
+	grantID, err := grantIDFromString(d.Id())
 	if err != nil {
 		return err
 	}
@@ -165,5 +166,5 @@ func DeleteStageGrant(data *schema.ResourceData, meta interface{}) error {
 
 	builder := snowflake.StageGrant(dbName, schemaName, stageName)
 
-	return deleteGenericGrant(data, meta, builder)
+	return deleteGenericGrant(d, meta, builder)
 }
